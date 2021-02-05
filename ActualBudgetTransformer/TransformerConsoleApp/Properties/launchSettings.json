@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TransformerConsoleApp": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\temp\\ing versimpeld.csv\" \"C:\\temp\\ing transformed.csv\""
+    }
+  }
+}
