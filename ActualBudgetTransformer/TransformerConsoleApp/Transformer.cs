@@ -15,11 +15,19 @@ namespace TransformerConsoleApp
             using var output = new StreamWriter(File.OpenWrite(outputFileName));
 
             string lineIn = input.ReadLine();
-            string lineOut = string.Concat(ingCsvHeaderParser.ParseOrThrow(lineIn));
+            if (lineIn == null) return;
+            string lineOut = string.Concat(IngCsvHeaderParser().ParseOrThrow(lineIn));
             output.WriteLine(lineOut);
+            for (lineIn = input.ReadLine();
+                lineIn != null;
+                lineIn = input.ReadLine())
+            {
+                lineOut = string.Concat(IngCsvRowParser().ParseOrThrow(lineIn));
+                output.WriteLine(lineOut);
+            }
         }
 
-        static readonly string[] expectedHeaderFields = { 
+        static readonly string[] expectedHeaderFields = {
             "Datum",
             "Naam / Omschrijving",
             "Rekening",
@@ -33,10 +41,10 @@ namespace TransformerConsoleApp
             "Tag"
         };
 
-        static readonly Parser<char, IEnumerable<char>> ingCsvHeaderParser = Parser<char>
+        private static Parser<char, IEnumerable<char>> IngCsvHeaderParser() => Parser<char>
             .Sequence(Intersperse(
-                expectedHeaderFields.Select(FieldParser), 
-                Parser.Char(';').IgnoreResult().Map(_ => AsEnumerable(','))))
+                expectedHeaderFields.Select(FieldParser),
+                SeparatorParser()))
             .Map(Concat);
 
         private static Parser<char, IEnumerable<char>> FieldParser(string field)
@@ -48,6 +56,67 @@ namespace TransformerConsoleApp
                 )
                 .Map(Concat);
         }
+
+        private static Parser<char, IEnumerable<char>> IngCsvRowParser() => Parser<char>
+            .Sequence(Intersperse(
+                expectedHeaderFields.Select(ValueParser),
+                SeparatorParser()))
+            .Map(Concat);
+
+        private static Parser<char, IEnumerable<char>> ValueParser(string field)
+        {
+            return Parser<char>.Sequence(
+                    Parser.Char('"').Map(AsEnumerable),
+                    InnerValueParser(field),
+                    Parser.Char('"').Map(AsEnumerable)
+                )
+                .Map(Concat);
+        }
+
+        private static Parser<char, IEnumerable<char>> InnerValueParser(string field)
+        {
+            switch (field)
+            {
+                case "Datum":
+                    return DateParser();
+                default:
+                    return Parser.AnyCharExcept('"').Many();
+            }
+        }
+
+        private static Parser<char, IEnumerable<char>> DateParser()
+        {
+            return Parser.Digit
+                .Repeat(8)
+                .Map(DashDate);
+        }
+
+        private static IEnumerable<char> DashDate(IEnumerable<char> digits)
+        {
+            IEnumerator<char> etor = digits.GetEnumerator();
+            for (int i = 0; i < 4; i++)
+            {
+                if (etor.MoveNext())
+                    yield return etor.Current;
+            }
+            yield return '-';
+            for (int i = 0; i < 2; i++)
+            {
+                if (etor.MoveNext())
+                    yield return etor.Current;
+            }
+            yield return '-';
+            for (int i = 0; i < 2; i++)
+            {
+                if (etor.MoveNext())
+                    yield return etor.Current;
+            }
+        }
+
+        private static Parser<char, IEnumerable<char>> SeparatorParser() => Parser
+            .Char(';')
+            .IgnoreResult()
+            .Map(_ => AsEnumerable(','));
 
         private static IEnumerable<char> Concat(IEnumerable<IEnumerable<char>> arg)
         {
@@ -79,11 +148,5 @@ namespace TransformerConsoleApp
         {
             return arg;
         }
-
-        static readonly Parser<char, IEnumerable<char>> ingCsvLineParser = Parser.AnyCharExcept()
-            .Many();
-
-        // delegate IEnumerator<char>? Parser<char, IEnumerator<char>>(IEnumerator<char> input);
-        // public static Result<char, T> Parse<T>(this Parser<char, T> parser, TextReader input, Func<char, SourcePos, SourcePos>? calculatePos = null)
     }
 }
