@@ -19,12 +19,24 @@ namespace TransformerConsoleApp
             output.WriteLine(lineOut);
         }
 
+        static readonly string[] expectedHeaderFields = { 
+            "Datum",
+            "Naam / Omschrijving",
+            "Rekening",
+            "Tegenrekening",
+            "Code",
+            "Af Bij",
+            "Bedrag (EUR)",
+            "Mutatiesoort",
+            "Mededelingen",
+            "Saldo na mutatie",
+            "Tag"
+        };
+
         static readonly Parser<char, IEnumerable<char>> ingCsvHeaderParser = Parser<char>
-            .Sequence(
-                FieldParser("Datum"),
-                Parser.Char(';').IgnoreResult().Map(_ => AsEnumerable(',')),
-                FieldParser("Naam / Omschrijving")
-            )
+            .Sequence(Intersperse(
+                expectedHeaderFields.Select(FieldParser), 
+                Parser.Char(';').IgnoreResult().Map(_ => AsEnumerable(','))))
             .Map(Concat);
 
         private static Parser<char, IEnumerable<char>> FieldParser(string field)
@@ -45,6 +57,16 @@ namespace TransformerConsoleApp
                 {
                     yield return chr;
                 }
+            }
+        }
+        private static IEnumerable<T> Intersperse<T>(IEnumerable<T> source, T element)
+        {
+            bool first = true;
+            foreach (T value in source)
+            {
+                if (!first) yield return element;
+                yield return value;
+                first = false;
             }
         }
 
